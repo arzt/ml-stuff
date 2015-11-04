@@ -1,4 +1,4 @@
-package de.arzt.berlin.ml
+package de.berlin.arzt.ml
 
 import java.nio.file.Paths
 
@@ -6,6 +6,10 @@ import breeze.linalg.{DenseMatrix, DenseVector}
 import org.apache.spark.mllib.recommendation.{ALS, Rating}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
+
+import scala.io.Codec
+import scala.io.Source.fromURL
+import scala.util.Try
 
 case class MovieModel(
   userFeatures: DenseMatrix[Double],
@@ -44,27 +48,35 @@ case class Rating(
 
 object MovieLensExample {
 
-  val folder = "/Users/sarzt/Downloads/ml-100k"
-  val modelPath = Paths.get(s"$folder/model.bin")
+  val modelPath = Paths.get(s"./model.bin")
 
   def main(args: Array[String]) = {
     /*
     */
-    implicit val context = sparkContext()
-    val (ratings, seen) = movieLensRatings(folder)
-    val idxToName = movieNames(folder)
+    val master = Try(args(0)).toOption
+    implicit val context = sparkContext(master)
+    val pre = "http://files.grouplens.org/datasets/movielens/ml-100k"
+    val udata = s"$pre/u.data"
+    val uitem = s"$pre/u.item"
+    implicit val codec = Codec.ISO8859
+    val lines = getLinesFromUrl(udata)
+    val ratings = movieLensRatings(lines)
+    val seen = ratedMovies(ratings)
+    val uitemLines = getLinesFromUrl(uitem)
+    val idxToName = movieNames(uitemLines)
     val modelToSave = trainMovieLensModel(ratings, seen, idxToName)
     saveModel(modelPath, modelToSave)
 
     val model = loadModel(modelPath)
-    val users = List(1, 4, 5, 9)
-    val limit = 10
-    val results = predictMovieLens(model, users, limit)
-
+    val results = predictMovieLens(
+      model,
+      users = 50 to 60,
+      limit = 10
+    )
     printResults(results)
   }
 
-  def printResults(results: Seq[Result]) {
+  def printResults(results: Iterable[Result]) {
     results.foreach {
       case Result(user, recommendations) =>
         println(s"Recommendation for user $user:")
@@ -119,7 +131,7 @@ object MovieLensExample {
     )
   }
 
-  def predictMovieLens(model: MovieModel, users: Seq[Int], limit: Int) = {
+  def predictMovieLens(model: MovieModel, users: Iterable[Int], limit: Int) = {
     println("Predicting Recommendations.")
     model match {
       case MovieModel(userFeats, movieFeats, seenMovies, idx2Name) =>
@@ -140,9 +152,9 @@ object MovieLensExample {
     }
   }
 
-  def movieNames(folder: String)(implicit context: SparkContext) = {
+  def movieNames(items: RDD[String])(implicit context: SparkContext) = {
     println("Reading movie names.")
-    val pairs = context.textFile(folder + "/u.item").map {
+    val pairs = items.map {
       case line =>
         line.split("[|]").take(2)
     }
@@ -155,21 +167,22 @@ object MovieLensExample {
     }
   }
 
-  def movieLensRatings(folder: String)(implicit context: SparkContext) = {
+  def getLinesFromUrl(url: String)(implicit context: SparkContext, codec: Codec) = context.parallelize(fromURL(url)(codec).getLines().toVector)
+
+  def movieLensRatings(lines: RDD[String])(implicit context: SparkContext) = {
     println("Reading movie ratings.")
-    val lines = context.textFile(folder + "/u.data").map {
-      case line =>
-        line.split( """\s""").take(3)
-    }
-    val ratings = lines.collect {
+    lines.map(_.split( """\s""").take(3)).collect {
       case Array(user, movie, rating) =>
-        Rating(
+        new Rating(
           user = user.toInt,
           product = movie.toInt,
           rating = rating.toDouble
         )
     }
-    val rated = ratings.map {
+  }
+
+  def ratedMovies(ratings: RDD[Rating]) =
+    ratings.map {
       case Rating(user, movie, _) =>
         user -> movie
     }.groupByKey().map {
@@ -179,14 +192,19 @@ object MovieLensExample {
           movies = movies.toSet
         )
     }
-    (ratings, rated)
-  }
 
-  def sparkContext() = {
+
+  def sparkContext(url: Option[String]) = {
     println("Setting up spark context.")
     val conf = new SparkConf()
       .setAppName("MovieLens Recommendation Example")
-      .setMaster("local")
+    url.foreach(conf.setMaster)
+    if (Try(conf.get("spark.master")).isFailure) {
+      conf.setMaster("local")
+    }
+    for (master <- Try(conf.get("spark.master"))) {
+       println(s"Master: $master")
+    }
     new SparkContext(conf)
   }
 }

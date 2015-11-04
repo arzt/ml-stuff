@@ -1,7 +1,8 @@
-package de.arzt.berlin.ml
+package de.berlin.arzt.ml
 
 import breeze.linalg.DenseMatrix
 import breeze.linalg.DenseMatrix.zeros
+import org.apache.spark.mllib.recommendation.{MatrixFactorizationModel, Rating, ALS}
 import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.util.Random
@@ -35,8 +36,7 @@ object RecommendationExample {
     als.setLambda(lambda)
     als.setNonnegative(true)
     als.setAlpha(alpha)
-    val model = als.run(sc.parallelize(ratings))
-
+    val model: MatrixFactorizationModel = als.run(sc.parallelize(ratings))
     val prodFeat = model.productFeatures.collect
     val userFeat = model.userFeatures.collect
 

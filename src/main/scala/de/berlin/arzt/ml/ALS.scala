@@ -1,4 +1,4 @@
-package de.arzt.berlin.ml
+package de.berlin.arzt.ml
 
 import breeze.linalg.DenseMatrix.{ones, rand, zeros}
 import breeze.linalg.{DenseMatrix, View, sum}

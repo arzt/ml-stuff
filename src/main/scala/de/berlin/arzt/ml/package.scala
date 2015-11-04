@@ -1,6 +1,6 @@
-package de.arzt.berlin
+package de.berlin.arzt
 
-import java.io.{ObjectOutputStream, ObjectInputStream}
+import java.io.{ObjectInputStream, ObjectOutputStream}
 import java.nio.file.{Files, Path}
 
 import breeze.linalg.DenseMatrix
