@@ -38,40 +38,60 @@ case class Movie(
   name: String
 )
 
-/*
-case class Rating(
-  user: Int,
-  product: Int,
-  rating: Double
-)
-*/
-
 object MovieLensExample {
 
+  val pre = "http://files.grouplens.org/datasets/movielens/ml-100k"
+  val uItem = s"$pre/u.item"
+  val uData = s"$pre/u.data"
   val modelPath = Paths.get(s"./model.bin")
 
   def main(args: Array[String]) = {
-    /*
-    */
     val master = Try(args(0)).toOption
     implicit val context = sparkContext(master)
-    val pre = "http://files.grouplens.org/datasets/movielens/ml-100k"
-    val udata = s"$pre/u.data"
-    val uitem = s"$pre/u.item"
     implicit val codec = Codec.ISO8859
-    val lines = getLinesFromUrl(udata)
+    val lines = getLinesFromUrl(uData)
     val ratings = movieLensRatings(lines)
-    val seen = ratedMovies(ratings)
-    val uitemLines = getLinesFromUrl(uitem)
-    val idxToName = movieNames(uitemLines)
-    val modelToSave = trainMovieLensModel(ratings, seen, idxToName)
-    saveModel(modelPath, modelToSave)
+    //the data size can be reduced here
+    //.filter { rating => rating.product <= 200 && rating.user <= 200 }
 
+    val seen = ratedMovies(ratings)
+    val uItemLines = getLinesFromUrl(uItem)
+    val idxToName = movieNames(uItemLines)
+
+    val n = ratings.map(_.user).max + 1
+    val m = ratings.map(_.product).max + 1
+
+    val rank = 10
+    val λ = 0.01
+    val ε = 0.0005
+    val (y, rated, unrated) = createMatrices(n, m, ratings)
+
+    //use ALS implementation from apache spark (much faster)
+    //val (row, col) = trainSparkAlsModel(n, m, ratings, rank, λ)
+
+    val (row, col) = BreezeAls.trainModel(y, rated, unrated, rank, ε, λ)
+
+    /* String representations of original and predicted rating matrices
+    val r2 = DenseMatrix.zeros[Boolean](rated.rows, rated.cols)
+    val original  = ratingMatToString(y, unrated)
+    val predicted = ratingMatToString(row*col, r2)
+    * */
+
+    val modelToSave = MovieModel(
+      userFeatures = row,
+      movieFeatures = col,
+      seenMovies = seen.collectAsMap().toMap,
+      idx2Name = idxToName.collectAsMap().toMap
+    )
+
+    //just to simulate production
+    saveModel(modelPath, modelToSave)
+    context.stop()
     val model = loadModel(modelPath)
-    val results = predictMovieLens(
+    val results = recommendMovies(
       model,
-      users = 50 to 60,
-      limit = 10
+      users = 20 to 30,
+      limit = 20
     )
     printResults(results)
   }
@@ -88,50 +108,52 @@ object MovieLensExample {
     }
   }
 
-  def trainMovieLensModel(
+  def trainSparkAlsModel(
+    users: Int,
+    movies: Int,
     ratings: RDD[Rating],
-    seen: RDD[SeenMovies],
-    movie: RDD[Movie]
+    rank: Int,
+    λ: Double
   )(implicit context: SparkContext) = {
-
     println("Starting training.")
-
-    val users = ratings.map(_.user).max
-    val movies = ratings.map(_.product).max
-
-    val rank = 10
 
     val als = new ALS()
       .setSeed(8)
       .setRank(rank)
-      .setIterations(10)
-      .setLambda(0.1)
+      .setIterations(20)
+      .setLambda(λ)
       .setNonnegative(true)
 
     val model = als.run(ratings)
+    val movieFeat = model.productFeatures
+    val userFeat = model.userFeatures
+    val userFeatures = featuresToMatrix(rank, users, userFeat).t
+    val movieFeatures = featuresToMatrix(rank, movies, movieFeat)
 
-    val movieFeat = model.productFeatures.collect()
-    val userFeat = model.userFeatures.collect()
-
-    val finalSeen = seen.map {
-      case SeenMovies(user, seen) =>
-        user -> seen
-    }
-
-    val idxToName = movie.map {
-      case Movie(idx, name) =>
-        (idx, name)
-    }
-
-    MovieModel(
-      userFeatures = featuresToMatrix(rank, users, userFeat).t,
-      movieFeatures = featuresToMatrix(rank, movies, movieFeat),
-      seenMovies = finalSeen.collectAsMap().toMap,
-      idx2Name = idxToName.collectAsMap().toMap
-    )
+    (userFeatures, movieFeatures)
   }
 
-  def predictMovieLens(model: MovieModel, users: Iterable[Int], limit: Int) = {
+
+  def createMatrices(
+    rows: Int,
+    cols: Int,
+    ratings: RDD[Rating]
+  )(implicit context: SparkContext) = {
+
+    import DenseMatrix.{zeros, ones}
+    val R = zeros[Boolean](rows, cols)
+    val Y = zeros[Double](rows, cols)
+    val rats: Array[Rating] = ratings.collect()
+    rats.foreach {
+      case Rating(i, j, y) =>
+        R(i, j) = true
+        Y(i, j) = y
+    }
+    val N = R.map(!_)
+    (Y, R, N)
+  }
+
+  def recommendMovies(model: MovieModel, users: Iterable[Int], limit: Int) = {
     println("Predicting Recommendations.")
     model match {
       case MovieModel(userFeats, movieFeats, seenMovies, idx2Name) =>
@@ -145,37 +167,34 @@ object MovieLensExample {
             val sortedUnseen = unseen.toSeq.sortBy(_._2).reverse.take(limit)
             val recommendations = sortedUnseen.map {
               case (idx, score) =>
-                RankedMovie(idx2Name(idx), score)
+                val name = idx2Name.getOrElse(idx, "")
+                RankedMovie(name, score)
             }
             Result(user, recommendations)
         }
     }
   }
 
-  def movieNames(items: RDD[String])(implicit context: SparkContext) = {
+  def movieNames(lines: RDD[String])(implicit context: SparkContext) = {
     println("Reading movie names.")
-    val pairs = items.map {
+    lines.map {
       case line =>
         line.split("[|]").take(2)
-    }
-    pairs.collect {
-      case Array(id, name) =>
-        Movie(
-          idx = id.toInt,
-          name
-        )
+    }.collect {
+      case Array(id, name) => (id.toInt, name)
     }
   }
 
-  def getLinesFromUrl(url: String)(implicit context: SparkContext, codec: Codec) = context.parallelize(fromURL(url)(codec).getLines().toVector)
+  def getLinesFromUrl(url: String)(implicit context: SparkContext, codec: Codec) =
+    context.parallelize(fromURL(url)(codec).getLines().toVector)
 
   def movieLensRatings(lines: RDD[String])(implicit context: SparkContext) = {
     println("Reading movie ratings.")
     lines.map(_.split( """\s""").take(3)).collect {
       case Array(user, movie, rating) =>
         new Rating(
-          user = user.toInt,
-          product = movie.toInt,
+          user = user.toInt - 1,
+          product = movie.toInt - 1,
           rating = rating.toDouble
         )
     }
@@ -187,10 +206,7 @@ object MovieLensExample {
         user -> movie
     }.groupByKey().map {
       case (id, movies) =>
-        SeenMovies(
-          user = id,
-          movies = movies.toSet
-        )
+        (id, movies.toSet)
     }
 
 
@@ -203,8 +219,10 @@ object MovieLensExample {
       conf.setMaster("local")
     }
     for (master <- Try(conf.get("spark.master"))) {
-       println(s"Master: $master")
+      println(s"Master: $master")
     }
-    new SparkContext(conf)
+    val context = new SparkContext(conf)
+    context.setCheckpointDir("/tmp")
+    context
   }
 }
