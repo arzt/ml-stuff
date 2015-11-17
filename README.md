@@ -20,6 +20,6 @@ If you have questions or experience problems running the code feel free to conta
 The code is tested/developed under Ubuntu 15.10 with installed Open JDK 8.
 
 #TODOs
-* addionally implement real alternating least squares algo using explicit solution when fixing one of the both parameter matrices
-* add some scala tests and comments
+* additionally implement classic alternating least squares algorithm using explicit solution when fixing one of the two parameter matrices
+* add some Scala tests and comments
 * more user interactivity (choose algorithm-variant, set lambda, allow to specify user id for recommendations) 
