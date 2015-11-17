@@ -9,7 +9,7 @@ import scala.math._
 object Optimization {
 
   def empiricalGradient(f: Vec => Double, ε: Double)(x: Vec): Vec = {
-    val grad = DenseVector[Double](x.length)
+    val grad = new DenseVector[Double](x.length)
     for (i <- 0 until x.length) {
       val org = x(i)
       x(i) = org + ε

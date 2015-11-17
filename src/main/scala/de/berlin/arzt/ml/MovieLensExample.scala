@@ -63,7 +63,7 @@ object MovieLensExample {
 
     val rank = 10
     val λ = 0.01
-    val ε = 0.0005
+    val ε = 0.00075
     val (y, rated, unrated) = createMatrices(n, m, ratings)
 
     //use ALS implementation from apache spark (much faster)
@@ -127,7 +127,7 @@ object MovieLensExample {
     val model = als.run(ratings)
     val movieFeat = model.productFeatures
     val userFeat = model.userFeatures
-    val userFeatures = featuresToMatrix(rank, users, userFeat).t
+    val userFeatures = featuresToMatrix(rank, users, userFeat)
     val movieFeatures = featuresToMatrix(rank, movies, movieFeat)
 
     (userFeatures, movieFeatures)
@@ -160,8 +160,8 @@ object MovieLensExample {
         users.map {
           case user =>
             val seen = seenMovies.getOrElse(user, Set())
-            val userFeat = userFeats(user, ::)
-            val ratings: DenseVector[Double] = movieFeats.t * userFeat.t
+            val userFeat = userFeats(::, user)
+            val ratings: DenseVector[Double] = movieFeats.t * userFeat
             val idAndScore: Map[Int, Double] = ratings.data.zipWithIndex.map(_.swap)(collection.breakOut)
             val unseen = idAndScore -- seen
             val sortedUnseen = unseen.toSeq.sortBy(_._2).reverse.take(limit)

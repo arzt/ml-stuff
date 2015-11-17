@@ -14,7 +14,8 @@ libraryDependencies ++= Seq(
   "org.scalacheck" %% "scalacheck" % "1.12.2" % "test",
   "org.scalanlp" %% "breeze" % "0.11.2",
   "org.scalanlp" %% "breeze-natives" % "0.11.2",
-  "com.github.fommil.netlib" % "all" % "1.1.2"
+  "com.github.fommil.netlib" % "all" % "1.1.2",
+  "org.scalatest" % "scalatest_2.10" % "2.2.5" % "test"
 )
 
 mainClass in(Compile, run) := Some("de.berlin.arzt.ml.MovieLensExample")
