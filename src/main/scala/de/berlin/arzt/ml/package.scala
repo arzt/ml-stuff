@@ -75,4 +75,11 @@ package object ml {
     intMat(r) := ' '
     (0 until m.rows).flatMap( x => new String(intMat(x, ::).t.toArray) + "\n")(collection.breakOut)
   }
+
+
+  def printDot(i: Int, n: Int, d: Double) = {
+    val a = 1.0*i/n % d
+    val b = 1.0*(i-1)/n % d
+    if (a != b) print(".")
+  }
 }

@@ -12,11 +12,11 @@ libraryDependencies ++= Seq(
   "org.apache.spark" % "spark-core_2.10" % "1.5.1",
   "org.apache.spark" % "spark-mllib_2.10" % "1.5.1",
   "org.scalacheck" %% "scalacheck" % "1.12.2" % "test",
-  "org.scalanlp" %% "breeze" % "0.11.2",
-  "org.scalanlp" %% "breeze-natives" % "0.11.2",
+  "org.scalanlp" % "breeze_2.10" % "0.11.2",
+  "org.scalanlp" % "breeze-natives_2.10" % "0.11.2",
   "com.github.fommil.netlib" % "all" % "1.1.2",
   "org.scalatest" % "scalatest_2.10" % "2.2.5" % "test"
 )
 
-mainClass in(Compile, run) := Some("de.berlin.arzt.ml.MovieLensExample")
+mainClass in(Compile, run) := Some("de.berlin.arzt.ml.Main")
 
