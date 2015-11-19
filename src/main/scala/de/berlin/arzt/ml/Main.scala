@@ -1,11 +1,12 @@
 package de.berlin.arzt.ml
 
+import java.io.IOException
 import java.nio.file.Paths
 
 import org.apache.spark.{SparkContext, SparkConf}
 
 import scala.io.Codec
-import scala.util.Try
+import scala.util.{Try, Success}
 import MovieLens._
 
 /**
@@ -17,32 +18,74 @@ object Main {
   val uData = s"$pre/u.data"
   val modelPath = Paths.get(s"./model.bin")
 
-  def main(args: Array[String]) = {
-    val master = Try(args(0)).toOption
-    implicit val context = sparkContext(master)
+  def computeModel()(implicit context: SparkContext) = {
     implicit val codec = Codec.ISO8859
     val lines = getLinesFromUrl(uData)
     val ratings = movieLensRatings(lines)
+    val seen = ratedMovies(ratings)
     //the data size can be reduced here
     //.filter { rating => rating.product <= 400 && rating.user <= 400 }
 
-    val seen = ratedMovies(ratings)
     val uItemLines = getLinesFromUrl(uItem)
     val idxToName = movieNames(uItemLines)
-
     val n = ratings.map(_.user).max + 1
-    val m = ratings.map(_.product).max + 1
 
+    val m = ratings.map(_.product).max + 1
     val rank = 10
+
     val λ = 0.01
     val ε = 0.00075
     val (y, rated, unrated) = createMatrices(n, m, ratings)
+    println(
+      """Enter a number to choose the matrix factorization implementation used for collaborative filtering:
+        |1: Gradient Descent (own implementation)
+        |2: Alternating Least Squares (Spark implementation)
+        |3: Alternating Least Squares (own implementation, slow)
+      """.stripMargin
+    )
+    val (row, col) =
+      readInt match {
+        case 1 =>
+          Factorization.trainModel(y, rated, unrated, rank, ε, λ)
+        case 2 =>
+          trainSparkAlsModel(n, m, ratings, rank, λ)
+        case 3 =>
+          Factorization.runAls(y, rated, rank, ε, λ)
+        case i => throw new IOException(s"Unsupported Option: $i")
+      }
+    MovieModel(
+      userFeatures = row,
+      movieFeatures = col,
+      seenMovies = seen.collectAsMap().toMap,
+      idx2Name = idxToName.collectAsMap().toMap
+    )
+  }
 
-    //use ALS implementation from apache spark (much faster)
-    //val (row, col) = trainSparkAlsModel(n, m, ratings, rank, λ)
+  def main(args: Array[String]) = {
+    val master = Try(args(0)).toOption
+    implicit val context = sparkContext(master)
+    val model =
+      if (modelPath.toFile.exists()) {
+        println("Found an existing model. Do you want to reuse it (y/n)?")
+        readLine() match {
+          case "y" | "yes" =>
+            loadModel(modelPath)
+          case "n" | "no" =>
+            saveModel(
+              modelPath,
+              model = computeModel()
+            )
+          case i =>
+            throw new IOException(s"Unsupported input: '$i'")
+        }
+      } else {
+        println("No existing model found. Creating new one.")
+        saveModel(
+          modelPath,
+          model = computeModel()
+        )
+      }
 
-    val (row, col) = Factorization.trainModel(y, rated, unrated, rank, ε, λ)
-    //val (row, col) = Factorization.runAls(y, rated, rank, ε, λ)
 
     /* String representations of original and predicted rating matrices
     val r2 = DenseMatrix.zeros[Boolean](rated.rows, rated.cols)
@@ -50,23 +93,19 @@ object Main {
     val predicted = ratingMatToString(row*col, r2)
     * */
 
-    val modelToSave = MovieModel(
-      userFeatures = row,
-      movieFeatures = col,
-      seenMovies = seen.collectAsMap().toMap,
-      idx2Name = idxToName.collectAsMap().toMap
-    )
-
-    //just to simulate production
-    saveModel(modelPath, modelToSave)
     context.stop()
-    val model = loadModel(modelPath)
-    val results = recommendMovies(
-      model,
-      users = 20 to 30,
-      limit = 20
-    )
-    printResults(results)
+    recommendDialog(model)
+  }
+
+
+  def recommendDialog(model: MovieModel): Unit = {
+    println("Enter a list of user id numbers to get recommandations (CTRL-C to quit):")
+    Try {
+      val a = readLine().split("[^0-9]+").map(_.toInt)
+      val result = recommendMovies(model, a, limit = 20)
+      printResults(result)
+    }
+    recommendDialog(model)
   }
 
   def sparkContext(url: Option[String]) = {

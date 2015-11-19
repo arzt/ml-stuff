@@ -9,6 +9,8 @@ import breeze.linalg.{DenseVector, DenseMatrix}
 import breeze.stats.distributions.Gaussian
 import org.apache.spark.rdd.RDD
 
+import scala.util.Try
+
 package object ml {
 
   type Matrix = DenseMatrix[Double]
@@ -51,6 +53,7 @@ package object ml {
     val out = new ObjectOutputStream(new GZIPOutputStream(Files.newOutputStream(path)))
     out.writeObject(model)
     out.close()
+    model
   }
 
   def printMat(m: DenseMatrix[Double], row: String = "", col: String = ""): Unit = {
@@ -73,13 +76,13 @@ package object ml {
   def ratingMatToString(m: DenseMatrix[Double], r: DenseMatrix[Boolean]) = {
     val intMat = m.map(v => ('0' + Math.rint(v).toInt).toChar)
     intMat(r) := ' '
-    (0 until m.rows).flatMap( x => new String(intMat(x, ::).t.toArray) + "\n")(collection.breakOut)
+    (0 until m.rows).flatMap(x => new String(intMat(x, ::).t.toArray) + "\n")(collection.breakOut)
   }
 
 
   def printDot(i: Int, n: Int, d: Double) = {
-    val a = 1.0*i/n % d
-    val b = 1.0*(i-1)/n % d
+    val a = 1.0 * i / n % d
+    val b = 1.0 * (i - 1) / n % d
     if (a != b) print(".")
   }
 }
