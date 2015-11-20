@@ -31,10 +31,11 @@ object Main {
     val n = ratings.map(_.user).max + 1
 
     val m = ratings.map(_.product).max + 1
+    val normalizer = ratings.count().toDouble
     val rank = 10
 
     val λ = 0.01
-    val ε = 0.00075
+    val ε = 0.001
     val (y, rated, unrated) = createMatrices(n, m, ratings)
     println(
       """Enter a number to choose the matrix factorization implementation used for collaborative filtering:
@@ -46,7 +47,7 @@ object Main {
     val (row, col) =
       readInt match {
         case 1 =>
-          Factorization.trainModel(y, rated, unrated, rank, ε, λ)
+          Factorization.trainModel(y, rated, unrated, rank, ε, λ, normalizer)
         case 2 =>
           trainSparkAlsModel(n, m, ratings, rank, λ)
         case 3 =>
@@ -99,7 +100,8 @@ object Main {
 
 
   def recommendDialog(model: MovieModel): Unit = {
-    println("Enter a list of user id numbers to get recommandations (CTRL-C to quit):")
+    val maxId = model.userFeatures.cols - 1
+    println(s"Enter a list of user id numbers ∊ [0, $maxId] to get recommandations (CTRL-C to quit):")
     Try {
       val a = readLine().split("[^0-9]+").map(_.toInt)
       val result = recommendMovies(model, a, limit = 20)

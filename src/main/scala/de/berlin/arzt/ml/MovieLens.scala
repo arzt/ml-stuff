@@ -7,6 +7,7 @@ import org.apache.spark.rdd.RDD
 
 import scala.io.Codec
 import scala.io.Source.fromURL
+import scala.util.{Try, Success}
 
 case class MovieModel(
   userFeatures: DenseMatrix[Double],
@@ -100,18 +101,22 @@ object MovieLens {
       case MovieModel(userFeats, movieFeats, seenMovies, idx2Name) =>
         users.map {
           case user =>
-            val seen = seenMovies.getOrElse(user, Set())
-            val userFeat = userFeats(::, user)
-            val ratings: DenseVector[Double] = movieFeats.t * userFeat
-            val idAndScore: Map[Int, Double] = ratings.data.zipWithIndex.map(_.swap)(collection.breakOut)
-            val unseen = idAndScore -- seen
-            val sortedUnseen = unseen.toSeq.sortBy(_._2).reverse.take(limit)
-            val recommendations = sortedUnseen.map {
-              case (idx, score) =>
-                val name = idx2Name.getOrElse(idx, "")
-                RankedMovie(name, score)
+            Try {
+              val userFeat = userFeats(::, user)
+              val ratings = movieFeats.t * userFeat
+              val idAndScore: Map[Int, Double] = ratings.data.zipWithIndex.map(_.swap)(collection.breakOut)
+              val seen = seenMovies.getOrElse(user, Set())
+              val unseen = idAndScore -- seen
+              val sortedUnseen = unseen.toSeq.sortBy(_._2).reverse.take(limit)
+              val recommendations = sortedUnseen.map {
+                case (idx, score) =>
+                  val name = idx2Name.getOrElse(idx, "")
+                  RankedMovie(name, score)
+              }
+              Result(user, recommendations)
             }
-            Result(user, recommendations)
+        }.collect {
+          case Success(a) => a
         }
     }
   }

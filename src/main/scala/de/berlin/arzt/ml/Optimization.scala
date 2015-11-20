@@ -30,24 +30,24 @@ object Optimization {
     sum(δ :* δ)
   }
 
-  case class Step2(
+  case class StepInfo(
     iter: Int,
     y: Double,
     red: Double
   )
 
-  def gradientDescent(a: Double, ε: Double)(f: Vec => Double, δf: Vec => Vec)(x: Vec, acc: List[Step2] = Nil): List[Step2] = {
+  def gradientDescent(a: Double, ε: Double)(f: Vec => Double, δf: Vec => Vec)(x: Vec, acc: List[StepInfo] = Nil): List[StepInfo] = {
     val δ = δf(x)
     val step = δ * a
     x -= step
     val y = f(x)
     acc match {
       case Nil =>
-        val init = Step2(0, y, 0.5)
+        val init = StepInfo(0, y, 0.5)
         gradientDescent(a, ε)(f, δf)(x, List(init))
       case head :: tail =>
         val diff = abs(head.y - y)
-        val next = Step2(
+        val next = StepInfo(
           iter = head.iter + 1,
           y,
           red = y / head.y
@@ -61,12 +61,12 @@ object Optimization {
   }
 
 
-  def gradientDescent3(a: Double, ε: Double)(f: Vec => Double, δf: Vec => Vec)(x: Vec, acc: List[Step2] = Nil): List[Step2] = {
+  def gradientDescent3(a: Double, ε: Double)(f: Vec => Double, δf: Vec => Vec)(x: Vec, acc: List[StepInfo] = Nil): List[StepInfo] = {
     acc match {
       case Nil =>
         val y = f(x)
         val δ = δf(x)
-        val init = Step2(0, y, 0.5)
+        val init = StepInfo(0, y, 0.5)
         gradientDescent3(a, ε)(f, δf)(x, List(init))
       case head :: tail =>
         val shr = shrink(acc, 10)
@@ -78,7 +78,7 @@ object Optimization {
         } else if (y < head.y) {
           val red = y / head.y
           x -= step
-          val next = Step2(head.iter + 1, y, y / head.y) :: acc
+          val next = StepInfo(head.iter + 1, y, y / head.y) :: acc
           println(f"Step: ${head.iter + 1}%3d, y=$y%12.5f, a=$a%8.5f, |δ|=${norm(δ)}%10.5f, shrink=$shr%10.8f")
 
           gradientDescent3(a * 1.1, ε)(f, δf)(x, next)
@@ -88,13 +88,13 @@ object Optimization {
     }
   }
 
-  def gradientDescent4(a: Double, ε: Double, adjust: Int = 10)(f: Vec => Double, δf: Vec => Vec)(x: Vec, acc: List[Step2] = Nil): List[Step2] = {
+  def gradientDescent4(a: Double, ε: Double, adjust: Int = 10)(f: Vec => Double, δf: Vec => Vec)(x: Vec, acc: List[StepInfo] = Nil): List[StepInfo] = {
     val δ = δf(x)
     acc match {
       case Nil =>
         val y = f(x)
         val (an, yn) = minFGrad(f, δ, x, a)
-        val init = Step2(0, yn, yn / y)
+        val init = StepInfo(0, yn, yn / y)
         gradientDescent4(an, ε, adjust = 10)(f, δf)(x, List(init))
       case head :: tail =>
         val shr = shrink(acc, 10)
@@ -109,8 +109,8 @@ object Optimization {
           gradientDescent4(a * 1.5, ε, adjust = 10)(f, δf)(x, acc)
         } else if (y < head.y) {
           val red = y / head.y
-          val next = Step2(head.iter + 1, y, red) :: acc
-          println(f"Iteration: ${head.iter + 1}%3d, loss=${head.y}%12.5f, step=$a%7.5f, stop if $shr%10.8f < $ε%6.4f")
+          val next = StepInfo(head.iter + 1, y, red) :: acc
+          println(f"Iteration: ${head.iter + 1}%3d, loss=${head.y}%.5f, step=$a%.5f, stop if $shr%.5f < $ε%6.5f")
           gradientDescent4(a, ε, adjust - 1)(f, δf)(x, next)
         } else {
           val (an, yn) = minFGrad(f, δ, x, a)
@@ -119,7 +119,7 @@ object Optimization {
     }
   }
 
-  def shrink(steps: Seq[Step2], n: Int = 10) = {
+  def shrink(steps: Seq[StepInfo], n: Int = 10) = {
     val b = steps.view.take(n).foldLeft((0.0, 0.0)) {
       case ((x1, x2), z) => (x1 + 1, x2 + z.red)
     }

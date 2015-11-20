@@ -6,7 +6,7 @@ import Factorization._
 
 import scala.util.Random
 
-class BreezeAlsSpec extends FlatSpec with Matchers {
+class FactorizationSpec extends FlatSpec with Matchers {
 
   "The factorization loss function" should "be close to zero" in {
     val ε = 0.001
