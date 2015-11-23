@@ -6,7 +6,7 @@ import Optimization._
 
 class OptimizationSpec extends FlatSpec with Matchers {
 
-  "Emirical gradient" should "correctly approximate the numerical gradient" in {
+  "Empirical gradient" should "correctly approximate the numerical gradient" in {
     def f(x: Vec) = 3*x(0)*x(0)*x(0) - 4*x(1)*x(0) + 6*x(2)
     def δf(x: Vec) =
       DenseVector(
