@@ -26,4 +26,4 @@ The code is tested/developed under Ubuntu 15.10 with installed Open JDK 8.
 #TODOs
 * add more Scala tests and comments
 * more user interactivity (e.g. set lambda, and rank for factorization) 
-* try to speed um own ALS implementation
+* try to speed up own ALS implementation
