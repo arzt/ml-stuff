@@ -181,19 +181,38 @@ class FactorizationSpec extends FlatSpec with Matchers {
 
   "Ridge regression" should "solve a linear regression" in {
     val ε = 0.001
-    val n = 10
+    val n = 20
     val m = 10
     val x = normal(n, m)
-    val β = DenseVector.rand[Double](10)
+    val β = normalVec(m)
     val y = x * β
     val β2 = ridgeRegression(y, x, 0)
-    val diff = β :- β2
-    sum(diff :* diff) should be < ε
+    val y2 = x * β2
+    val diff = y :- y2
+    val sdiff = diff :* diff
+    val su = sum(sdiff)
+    su should be < ε
   }
 
-  "Filtered ridge regression" should "be equal to ridge regression for c=ones" in {
+  it should "solve a linear regression for λ = 1" in {
+    val ε = 1.0
+    val n = 400
+    val m = 300
+    val x = normal(n, m)
+    val β = normalVec(m)
+    println("max β: " + max(β :* β))
+    val λ = 1
+    val y = x * β
+    val β2 = ridgeRegression(y, x, λ)
+    println("max β2: " + max(β2 :* β2))
+    val y2 = x * β2
+    val diff = y :- y2
+    max(diff :* diff) should be < ε
+  }
+
+  "Filtered ridge regression" should "be equal to ridge regression for c=ones and λ=0" in {
     val ε = 0.001
-    val tn = 300
+    val tn = 500
     val tm = 400
     val c = DenseVector.ones[Double](tn)
     val x = normal(tn, tm)
@@ -201,27 +220,46 @@ class FactorizationSpec extends FlatSpec with Matchers {
     val β = DenseVector.rand[Double](tm)
     val y = x * β
 
-    val β1 = ridgeRegression(y, x, 0.1)
-    val β2 = filteredRidgeRegression(y, x, 0.1, c)
+    val β1 = ridgeRegression(y, x, 0.0)
+    val β2 = filteredRidgeRegression(y, x, 0.0, c)
 
     val diff = β1 :- β2
     sum(diff :* diff) should be < ε
   }
 
-  it should "solve a linear regression" in {
+
+  it should "be equal to ridge regression for c=ones and λ>0" in {
+    val ran = new Random(0)
     val ε = 0.001
-    val n = 30
-    val m = 20
-    val c = DenseVector.ones[Double](n)
-    val x = normal(n, m)
-    val β = DenseVector.rand[Double](m)
+    val tn = 500
+    val tm = 400
+    val c = DenseVector.ones[Double](tn)
+    val x = normal(tn, tm)
+    val λ = ran.nextDouble()
+    val β = DenseVector.rand[Double](tm)
     val y = x * β
-    val β2 = filteredRidgeRegression(y, x, 0, c)
-    val y2 = x * β2
-    val diff = y :- y2
+
+    val β1 = ridgeRegression(y, x, λ)
+    val β2 = filteredRidgeRegression(y, x, λ, c)
+
+    val diff = β1 :- β2
     sum(diff :* diff) should be < ε
   }
 
+  it should "solve a filtered linear regression" in {
+    val ε = 0.001
+    val h = 100
+    val c = DenseVector.rand[Double](h).map(x => if (x > 0.5) 1.0 else 0.0)
+    val n = sum(c).toInt
+    val m = n/2
+    val x = normal(h, m)
+    val β = DenseVector.rand[Double](m)
+    val y = diag(c) * x * β
+    val β2 = filteredRidgeRegression(y, x, 0, c)
+    val y2 = diag(c) * x * β2
+    val diff = y :- y2
+    max(diff :* diff) should be < ε
+  }
 
   "A alternating least square step" should "reduce the loss" in {
     val n = 3

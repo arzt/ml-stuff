@@ -3,7 +3,7 @@ package de.berlin.arzt.ml
 import breeze.linalg.DenseMatrix.{ones, zeros}
 import breeze.linalg.DenseVector.vertcat
 import breeze.linalg.View.Require
-import breeze.linalg.{diag, pinv, sum, DenseMatrix}
+import breeze.linalg._
 import System.{currentTimeMillis => time}
 import Optimization._
 import org.apache.spark.SparkContext
@@ -37,17 +37,15 @@ object Factorization {
     (dα :/ normalizer, dβ :/ normalizer)
   }
 
-  def ridgeRegression(y: Vec, x: Matrix, λ: Double) = {
+  def ridgeRegression(y: Vec, x: Matrix, λ: Double): Vec = {
     val I = DenseMatrix.eye[Double](x.cols)
-    val a = pinv(x.t * x + λ * I) * x.t * y
-    a
+    pinv(x.t * x + λ * I) * x.t * y
   }
 
   def filteredRidgeRegression(y: Vec, X: Matrix, λ: Double, c: Vec): Vec = {
     val C = diag(c)
     val I = DenseMatrix.eye[Double](X.cols)
-    val a = pinv(X.t * C * X + λ * I) * X.t * C * y
-    a
+    pinv(X.t * C * X + λ * I) * X.t * C * y
   }
 
   def alsStep(y: Matrix, r: DenseMatrix[Boolean], λ: Double)(in: Matrix) = {

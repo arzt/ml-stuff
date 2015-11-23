@@ -18,6 +18,8 @@ package object ml {
 
   def normal(rows: Int, cols: Int, variance: Double = 1) = rand[Double](rows, cols, Gaussian(0, variance))
 
+  def normalVec(length: Int, variance: Double = 1) = DenseVector.rand[Double](length, Gaussian(0, variance))
+
   def featuresToMatrix(
     rows: Int, cols: Int,
     features: RDD[(Int, Array[Double])]
