@@ -101,7 +101,7 @@ object Main {
 
   def recommendDialog(model: MovieModel): Unit = {
     val maxId = model.userFeatures.cols - 1
-    println(s"Enter a list of user id numbers ∊ [0, $maxId] to get recommandations (CTRL-C to quit):")
+    println(s"Enter a list of user id numbers ∊ [0, $maxId] to get recommendations (CTRL-C to quit):")
     Try {
       val a = readLine().split("[^0-9]+").map(_.toInt)
       val result = recommendMovies(model, a, limit = 20)
