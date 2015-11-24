@@ -3,15 +3,15 @@ package de.berlin.arzt.ml
 import java.io.IOException
 import java.nio.file.Paths
 
-import org.apache.spark.{SparkContext, SparkConf}
+import org.apache.spark.{ SparkContext, SparkConf }
 
 import scala.io.Codec
-import scala.util.{Try, Success}
+import scala.util.{ Try, Success }
 import MovieLens._
 
 /**
-  * Created by realdocx on 18.11.15.
-  */
+ * Created by realdocx on 18.11.15.
+ */
 object Main {
   val pre = "http://files.grouplens.org/datasets/movielens/ml-100k"
   val uItem = s"$pre/u.item"
@@ -42,8 +42,7 @@ object Main {
         |1: Gradient Descent (own implementation)
         |2: Alternating Least Squares (Spark implementation)
         |3: Alternating Least Squares (own implementation, slow)
-      """.stripMargin
-    )
+      """.stripMargin)
     val (row, col) =
       readInt match {
         case 1 =>
@@ -58,8 +57,7 @@ object Main {
       userFeatures = row,
       movieFeatures = col,
       seenMovies = seen.collectAsMap().toMap,
-      idx2Name = idxToName.collectAsMap().toMap
-    )
+      idx2Name = idxToName.collectAsMap().toMap)
   }
 
   def main(args: Array[String]) = {
@@ -74,8 +72,7 @@ object Main {
           case "n" | "no" =>
             saveModel(
               modelPath,
-              model = computeModel()
-            )
+              model = computeModel())
           case i =>
             throw new IOException(s"Unsupported input: '$i'")
         }
@@ -83,10 +80,8 @@ object Main {
         println("No existing model found. Creating new one.")
         saveModel(
           modelPath,
-          model = computeModel()
-        )
+          model = computeModel())
       }
-
 
     /* String representations of original and predicted rating matrices
     val r2 = DenseMatrix.zeros[Boolean](rated.rows, rated.cols)
@@ -97,7 +92,6 @@ object Main {
     context.stop()
     recommendDialog(model)
   }
-
 
   def recommendDialog(model: MovieModel): Unit = {
     val maxId = model.userFeatures.cols - 1

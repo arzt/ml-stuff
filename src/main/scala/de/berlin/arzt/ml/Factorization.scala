@@ -95,20 +95,28 @@ object Factorization {
     val α = normal(rank, rows)
     val β = normal(rank, cols)
     val x = toFlat(α, β)
-    gradientDescent4(0.001, ε)(loss(y, rated, λ, normalizer), gradientFlat(y, unrated, λ, normalizer))(x)
+    val f = loss(y, rated, λ, normalizer) _
+    val df = gradientFlat(y, unrated, λ, normalizer) _
+    //x := fmincg(f, df, x)
+    gradientDescent4(0.001, ε)(f, df)(x)
     fromFlat(rows, cols, x)
   }
 
   def runAls(y: Matrix, rated: DenseMatrix[Boolean], rank: Int, ε: Double, λ: Double) = {
     val α = normal(rank, y.rows)
     val β = normal(rank, y.cols)
+    val normalizer = sum(rated.map(x => if (x) 1 else 0))
+    val l = lossUnflattened(y, rated, λ)(α, β)/normalizer
+    println(f"loss:$l%10.6f")
     runAlsRec(y, rated, ε, λ)(α, β, Nil)
   }
 
   def runAlsRec(y: Matrix, rated: DenseMatrix[Boolean], ε: Double, λ: Double)(α: Matrix, β: Matrix, steps: List[Double]): (Matrix, Matrix) = {
     β := alsStep(y, rated, λ)(α)
     α := alsStep(y.t, rated.t, λ)(β)
-    val l = lossUnflattened(y, rated, λ)(α, β)
+    val normalizer = sum(rated.map(x => if (x) 1 else 0))
+        
+    val l = lossUnflattened(y, rated, λ)(α, β)/normalizer
     println(f"loss:$l%10.6f")
     steps match {
       case Nil =>
@@ -126,12 +134,13 @@ object Factorization {
     β := alsStepPar(y, rated, λ)(α)
     α := alsStepPar(y.t, rated.t, λ)(β)
     val yj = α.t * β
-    val l = lossUnflattened(y, rated, λ)(α, β)
+    val normalizer = sum(rated.map(x => if (x) 1 else 0))
+    val l = lossUnflattened(y, rated, λ, normalizer)(α, β)
+    println(f"loss:$l%10.6f")
     steps match {
       case Nil =>
         runAlsRecPar(y, rated, ε, λ)(α, β, l :: Nil)
       case head :: tail =>
-        println(f"loss:$l%10.6f")
         if (l + ε < head) {
           runAlsRecPar(y, rated, ε, λ)(α, β, l :: steps)
         } else {
@@ -166,9 +175,12 @@ object Factorization {
     var t0 = System.currentTimeMillis() / 10d
     val ε = 0.001
     val λ = 0.01
+    val f = loss(y, rated, λ, normalizer) _
+    val df = gradientFlat(y, unrated, λ, normalizer) _
+    val result0 = fmincg(f, df, x1)
+    val result1 = gradientDescent4(a, ε, adjust = 10)(f, df)(x1)
     implicit val context = Main.sparkContext(None)
     val (a1, b1) = runAlsRec(y, rated, ε, λ)(α, β, Nil)
-    val result1 = gradientDescent4(a, ε, adjust = 10)(loss(y, rated, λ, normalizer), gradientFlat(y, unrated, λ, normalizer))(x1)
 
     val (rowr, colr) = fromFlat(n, m, x1)
 
