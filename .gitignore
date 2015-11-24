@@ -1,12 +1,17 @@
 *.class
 *.log
-
+*.bin
+*.sc
 # sbt specific
-.cache
+.cache*
 .history
+.classpath
+.settings
+.project
 .lib/
 dist/*
 target/
+project/
 lib_managed/
 src_managed/
 project/boot/
